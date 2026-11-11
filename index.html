@@ -11,7 +11,7 @@
 <body class="show-objc">
 <header class="hero"><div class="wrap"><h1>Cocos Game iOS SDK</h1><p>客户端接入、配置、运行与下载 · v0.6.13 · 支持 Objective-C 与 Swift</p></div></header>
 <main class="content wrap">
-  <section class="card toc"><strong>示例语言：</strong><span class="lang"><button data-lang="objc">Objective-C</button><button data-lang="swift">Swift</button></span><br><strong>目录：</strong><a href="#download">下载</a><a href="#quickstart">快速开始</a><a href="#install">导入 SDK</a><a href="#init">初始化</a><a href="#open">打开游戏</a><a href="#callback">回调</a><a href="#event">通用事件</a><a href="#api">API</a><a href="#fullscreen">全屏</a><a href="#mini">迷你条</a><a href="#preload">预加载</a><a href="#host-ui">竖屏宿主自绘</a><a href="#guest">游客观战</a><a href="#run">Demo</a><a href="#faq">常见问题</a><a href="#checklist">验收</a></section>
+  <section class="card toc"><strong>示例语言：</strong><span class="lang"><button data-lang="objc">Objective-C</button><button data-lang="swift">Swift</button></span><br><strong>目录：</strong><a href="#download">下载</a><a href="#quickstart">快速开始</a><a href="#install">导入 SDK</a><a href="#init">初始化</a><a href="#open">打开游戏</a><a href="#callback">回调</a><a href="#event">通用事件</a><a href="#api">API</a><a href="#fullscreen">全屏</a><a href="#mini">迷你条</a><a href="#preload">预加载</a><a href="#bet-ui">竖屏下注弹窗</a><a href="#host-ui">竖屏宿主自绘</a><a href="#guest">游客观战</a><a href="#run">Demo</a><a href="#faq">常见问题</a><a href="#checklist">验收</a></section>
   <section class="card" id="download"><h2>下载</h2><div class="grid">
     <a class="download" href="https://github.com/eathwinster-jk/cocos-game-ios-sdk/releases/download/0.6.13/CocosGameSDK-0.6.13.xcframework.zip"><strong>下载 iOS SDK</strong><span>CocosGameSDK-0.6.13.xcframework.zip · 动态 framework · SHA-256 195c18…1ad2</span></a>
     <a class="download" href="https://github.com/eathwinster-jk/cocos-game-ios-demo/releases/download/0.6.0/CocosGameDemo-0.6.0-simulator.zip"><strong>下载模拟器 Demo App</strong><span>CocosGameDemo-0.6.0-simulator.zip · arm64 / x86_64 模拟器</span></a>
@@ -338,19 +338,96 @@ CocosGameSDK.shared.refreshRecords(isHistory: false)
 
 // 切换群：先关闭再打开
 CocosGameSDK.shared.close()</code></pre></section>
-  <section class="card" id="host-ui"><h2>竖屏宿主自绘下注、记录与退出</h2><p>竖屏时下注、记录与规则、退出确认都可由宿主自绘，样式与宿主 App 一致；全屏时统一由游戏内弹窗展示，不回调宿主。宿主实现对应可选回调即视为接管，未实现时沿用 SDK 自带界面。</p><table><thead><tr><th>界面</th><th>接管条件</th><th>宿主调用</th></tr></thead><tbody><tr><td>下注</td><td>实现 <code class="objc">gameSDKDidReceiveBetOptions:gameId:</code><code class="swift">gameSDKDidReceiveBetOptions(_:gameId:)</code></td><td><code class="objc">submitBetWithRoundId:areaCode:amountCent:clientBetNo:</code><code class="swift">submitBet(roundId:areaCode:amountCent:clientBetNo:)</code></td></tr><tr><td>记录与规则</td><td>实现 <code class="objc">gameSDKDidRequestShowRecords:gameId:</code><code class="swift">gameSDKDidRequestShowRecords(_:gameId:)</code></td><td><code class="objc">queryRecordsIsHistory:…</code><code class="swift">queryRecords(isHistory:…)</code> / <code class="objc">loadMoreRecordsIsHistory:</code><code class="swift">loadMoreRecords(isHistory:)</code> / <code class="objc">refreshRecordsIsHistory:</code><code class="swift">refreshRecords(isHistory:)</code>（0.6.8）</td></tr><tr><td>退出确认</td><td>必选回调 <code class="objc">gameSDKDidRequestExitWithCompletion:</code><code class="swift">gameSDKDidRequestExit(completion:)</code></td><td>回调 completion</td></tr></tbody></table><h3>加注卡片放入宿主容器（0.6.12）</h3><p>不想自绘、又想自己决定加注卡片的位置时，可以把 SDK 自带加注卡片放进宿主提供的容器。仅在未实现下注代理回调时生效；全屏横屏仍由游戏内弹层展示。</p><ul><li>须在主线程调用，建议在 <code class="objc">openGame:…</code><code class="swift">openGame(…)</code> 前后设置；SDK 只弱引用容器。</li><li>卡片四边贴齐容器，宿主只需约束容器的位置与宽度；建议给容器加一条低优先级（如 250）的高度为 0 的约束，卡片未显示时容器高度为 0、不出现约束歧义。</li><li>传 nil 恢复默认位置（紧贴游戏容器下方）。</li></ul><pre class="objc"><code>NSLayoutConstraint *collapsed = [self.betContainer.heightAnchor constraintEqualToConstant:0];
+  <section class="card" id="bet-ui"><h2>竖屏下注弹窗：三种接入方式</h2>
+<p>竖屏内嵌时，每局下注阶段要给玩家展示「下注对象 + 筹码」的下注界面。宿主可以<strong>直接使用游戏（SDK）提供的加注卡片</strong>，也可以<strong>完全自己画</strong>；使用 SDK 卡片时，还可以把它放进宿主自己的容器里决定位置。三种方式任选其一，不需要的不用接。全屏横屏时统一由游戏内弹窗展示，与这里的选择无关。</p>
+<table><thead><tr><th>方式</th><th>宿主要做的</th><th>界面</th><th>下注提交</th><th>适合</th></tr></thead><tbody>
+<tr><td>A. SDK 默认位置</td><td>什么都不用做</td><td>SDK 加注卡片，紧贴游戏容器下方（左右各 14pt），覆盖在宿主内容之上</td><td>SDK 处理</td><td>快速接入、没有特殊布局要求</td></tr>
+<tr><td>B. 放入宿主容器（0.6.12）</td><td>提供一个 UIView 容器，调用 <code class="objc">setBetPanelContainer:</code><code class="swift">setBetPanelContainer(_:)</code></td><td>SDK 加注卡片，位置与宽度由宿主容器决定</td><td>SDK 处理</td><td>想用游戏提供的界面，但要放在页面指定位置（如聊天输入框上方）</td></tr>
+<tr><td>C. 宿主自绘</td><td>实现下注代理回调，自己画界面并提交</td><td>完全由宿主决定（UIKit / SwiftUI 均可）</td><td>宿主调用 <code class="objc">submitBetWithRoundId:…</code><code class="swift">submitBet(…)</code></td><td>要与 App 视觉完全一致，或需要埋点、二次确认等自定义交互</td></tr>
+</tbody></table>
+<ul><li>优先级：delegate 实现了 <code class="objc">gameSDKDidReceiveBetOptions:gameId:</code><code class="swift">gameSDKDidReceiveBetOptions(_:gameId:)</code>（方式 C）时，方式 A / B 都不生效；未实现时，设置了容器走方式 B，否则走方式 A。</li><li>方式 C 由是否实现该回调决定；如需运行时切换，可更换 <code>delegate</code> 对象。<code class="objc">setBetPanelContainer:nil</code><code class="swift">setBetPanelContainer(nil)</code> 回到默认位置。</li><li>所有接口都须在主线程调用，回调也都在主线程。</li></ul>
+<h3>方式 A：SDK 默认位置</h3><p>不实现下注回调、不设置容器即可。下注阶段 SDK 卡片自动出现在游戏容器下方，玩家点筹码即提交，下注成功或截止后自动收起。卡片会盖住游戏下方的宿主内容，如需避让请改用方式 B。</p>
+<h3>方式 B：把 SDK 卡片放入宿主容器</h3><p>界面仍是游戏提供的加注卡片，宿主只负责「放在哪」。</p>
+<p><strong>1. 创建容器并约束位置</strong>：只约束容器的位置与宽度，<strong>不要</strong>设置固定高度；再加一条低优先级的「高度为 0」约束，卡片未显示时容器高度为 0、不会出现约束歧义。外边距、背景等写在容器上。</p>
+<pre class="objc"><code>self.betContainer = [[UIView alloc] init];
+self.betContainer.translatesAutoresizingMaskIntoConstraints = NO;
+[self.view addSubview:self.betContainer];
+NSLayoutConstraint *collapsed = [self.betContainer.heightAnchor constraintEqualToConstant:0];
 collapsed.priority = UILayoutPriorityDefaultLow;
-collapsed.active = YES;
-[CocosGameSDK.shared setBetPanelContainer:self.betContainer];
-
-// 恢复 SDK 默认位置
-[CocosGameSDK.shared setBetPanelContainer:nil];</code></pre><pre class="swift"><code>let collapsed = betContainer.heightAnchor.constraint(equalToConstant: 0)
+[NSLayoutConstraint activateConstraints:@[
+    [self.betContainer.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:14],
+    [self.betContainer.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-14],
+    [self.betContainer.bottomAnchor constraintEqualToAnchor:self.chatInputView.topAnchor constant:-8],
+    collapsed,
+]];</code></pre>
+<pre class="swift"><code>betContainer.translatesAutoresizingMaskIntoConstraints = false
+view.addSubview(betContainer)
+let collapsed = betContainer.heightAnchor.constraint(equalToConstant: 0)
 collapsed.priority = .defaultLow
-collapsed.isActive = true
-CocosGameSDK.shared.setBetPanelContainer(betContainer)
+NSLayoutConstraint.activate([
+    betContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 14),
+    betContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -14),
+    betContainer.bottomAnchor.constraint(equalTo: chatInputView.topAnchor, constant: -8),
+    collapsed,
+])</code></pre>
+<p><strong>2. 打开游戏前后设置容器</strong>：</p>
+<pre class="objc"><code>[CocosGameSDK.shared setBetPanelContainer:self.betContainer];
+[CocosGameSDK.shared openGame:@"niuniu" sessionConfig:session inContainer:self.gameContainer fromViewController:self];</code></pre>
+<pre class="swift"><code>CocosGameSDK.shared.setBetPanelContainer(betContainer)
+CocosGameSDK.shared.openGame("niuniu", sessionConfig: session, container: gameContainer, viewController: self)</code></pre>
+<p><strong>3. 不需要时恢复默认</strong>：SDK 只弱引用容器，页面释放后自动失效；同一页面要切回默认位置时传 nil。</p>
+<p><strong>显示与收起规则</strong></p>
+<ul><li>下注阶段：卡片四边贴齐容器，容器高度随卡片内容撑开。</li><li>点筹码提交、下注截止或离局：卡片高度归零并隐藏，容器高度回到 0，相邻的宿主内容自动回位（使用 Auto Layout 时无需额外处理）。</li><li>切到全屏横屏时卡片收起，由游戏内弹窗接管。</li></ul>
+<p><strong>卡片内容</strong></p>
+<ul><li>已入座闲家：只有本座一个注区，卡片只显示「请加注筹码」与筹码按钮。</li><li>观战点头像跟注：卡片标题为「观战下注」，右侧金色标签显示「跟 昵称」，下方是筹码按钮（0.6.13）。</li><li>注区昵称过长时尾部省略。</li></ul>
+<p><strong>SwiftUI 页面</strong>：容器需要是 UIKit 视图。可在承载游戏的 <code>UIViewController</code>（通过 <code>UIViewControllerRepresentable</code> 嵌入）里同时创建游戏容器与下注容器并按上面的方式约束。</p>
+<h3>方式 C：宿主自绘下注界面</h3><p>delegate 实现下注回调后，竖屏不再显示 SDK 卡片，宿主根据回调数据自己画界面。</p>
+<table><thead><tr><th>回调 / 接口</th><th>时机</th><th>宿主要做的</th></tr></thead><tbody>
+<tr><td><code class="objc">gameSDKDidReceiveBetOptions:gameId:</code><code class="swift">gameSDKDidReceiveBetOptions(_:gameId:)</code></td><td>本局进入下注阶段；观战点头像跟注时同一局会再次回调</td><td>展示界面，以最新一次回调为准整体刷新</td></tr>
+<tr><td><code class="objc">gameSDKDidCloseBetRound:gameId:</code><code class="swift">gameSDKDidCloseBetRound(_:gameId:)</code></td><td>倒计时结束或离局</td><td>收起界面，之后提交会被拒绝</td></tr>
+<tr><td><code class="objc">submitBetWithRoundId:areaCode:amountCent:clientBetNo:</code><code class="swift">submitBet(roundId:areaCode:amountCent:clientBetNo:)</code></td><td>玩家选好注区与筹码</td><td>返回 NO 表示未发出（已截止、游戏未打开或幂等号重复）</td></tr>
+<tr><td><code class="objc">gameSDKDidReceiveBetResult:gameId:</code><code class="swift">gameSDKDidReceiveBetResult(_:gameId:)</code></td><td>提交结果返回</td><td>按 <code>clientBetNo</code> 对应提交，展示成功或 <code>errorMessage</code></td></tr>
+</tbody></table>
+<p><code>CocosGameBetOptions</code> 字段：<code>roundId</code> 局号、<code>countdownSeconds</code> 剩余秒数、<code>deadline</code> 截止时间、<code>areas</code> 注区列表（<code>areaCode</code> 提交用编码、<code>areaName</code> 展示名，跟注时为玩家昵称、押庄为「庄 · 昵称」）、<code>chipsCent</code> 筹码（单位分）。<code>CocosGameBetResult</code> 字段：<code>roundId</code>、<code>areaCode</code>、<code>amountCent</code>、<code>clientBetNo</code>、<code>isSuccess</code>、<code>balanceCent</code>（可能为 nil）、<code>errorMessage</code>。</p>
+<pre class="objc"><code>- (void)gameSDKDidReceiveBetOptions:(CocosGameBetOptions *)options gameId:(NSString *)gameId {
+    // 注区只有一个时可直接默认选中；倒计时用 options.deadline 计算
+    [self.betPanel showOptions:options];
+}
 
-// 恢复 SDK 默认位置
-CocosGameSDK.shared.setBetPanelContainer(nil)</code></pre><h3>下注</h3><pre class="objc"><code>- (void)gameSDKDidReceiveBetOptions:(CocosGameBetOptions *)options gameId:(NSString *)gameId {
+- (void)gameSDKDidCloseBetRound:(NSString *)roundId gameId:(NSString *)gameId {
+    [self.betPanel closeRound:roundId];
+}
+
+- (void)gameSDKDidReceiveBetResult:(CocosGameBetResult *)result gameId:(NSString *)gameId {
+    [self.betPanel showResult:result];
+}
+
+// 玩家点筹码时提交
+BOOL isSent = [CocosGameSDK.shared submitBetWithRoundId:options.roundId
+                                               areaCode:area.areaCode
+                                             amountCent:chipCent
+                                            clientBetNo:[CocosGameSDK createClientBetNo]];</code></pre>
+<pre class="swift"><code>func gameSDKDidReceiveBetOptions(_ options: CocosGameBetOptions, gameId: String) {
+    betPanel.show(options)
+}
+
+func gameSDKDidCloseBetRound(_ roundId: String, gameId: String) {
+    betPanel.close(roundId)
+}
+
+func gameSDKDidReceiveBetResult(_ result: CocosGameBetResult, gameId: String) {
+    betPanel.showResult(result)
+}
+
+// 玩家点筹码时提交
+let isSent = CocosGameSDK.shared.submitBet(roundId: options.roundId,
+                                           areaCode: area.areaCode,
+                                           amountCent: chipCent,
+                                           clientBetNo: CocosGameSDK.createClientBetNo())</code></pre>
+<ul><li><code>clientBetNo</code> 为幂等号（不超过 64 个字符），网络失败重试时沿用原幂等号；结果返回前或成功后重复提交会被忽略。</li><li>完整示例见 Demo 源码 <code>DemoHostBetPanel</code>。</li></ul>
+<h3>常见问题</h3><ul><li><strong>设置了容器但卡片仍在默认位置？</strong> 检查 delegate 是否实现了下注回调（方式 C 优先），以及是否在主线程调用、容器是否已加入视图层级。</li><li><strong>容器空的时候留了一块空白，或控制台报约束冲突？</strong> 容器不要设置固定高度，并按上文加一条低优先级的高度为 0 的约束。</li><li><strong>观战时会自动弹出吗？</strong> 不会。未入座观战时只有在下注阶段点击在桌用户头像才会弹出（竖屏、全屏一致）。</li><li><strong>记录与规则、退出确认也能自己画吗？</strong> 可以，见下方「竖屏宿主自绘」，与下注相互独立，可分别选择。</li></ul>
+</section>
+  <section class="card" id="host-ui"><h2>竖屏宿主自绘下注、记录与退出</h2><p>竖屏时下注、记录与规则、退出确认都可由宿主自绘，样式与宿主 App 一致；全屏时统一由游戏内弹窗展示，不回调宿主。宿主实现对应可选回调即视为接管，未实现时沿用 SDK 自带界面。</p><table><thead><tr><th>界面</th><th>接管条件</th><th>宿主调用</th></tr></thead><tbody><tr><td>下注</td><td>实现 <code class="objc">gameSDKDidReceiveBetOptions:gameId:</code><code class="swift">gameSDKDidReceiveBetOptions(_:gameId:)</code></td><td><code class="objc">submitBetWithRoundId:areaCode:amountCent:clientBetNo:</code><code class="swift">submitBet(roundId:areaCode:amountCent:clientBetNo:)</code></td></tr><tr><td>记录与规则</td><td>实现 <code class="objc">gameSDKDidRequestShowRecords:gameId:</code><code class="swift">gameSDKDidRequestShowRecords(_:gameId:)</code></td><td><code class="objc">queryRecordsIsHistory:…</code><code class="swift">queryRecords(isHistory:…)</code> / <code class="objc">loadMoreRecordsIsHistory:</code><code class="swift">loadMoreRecords(isHistory:)</code> / <code class="objc">refreshRecordsIsHistory:</code><code class="swift">refreshRecords(isHistory:)</code>（0.6.8）</td></tr><tr><td>退出确认</td><td>必选回调 <code class="objc">gameSDKDidRequestExitWithCompletion:</code><code class="swift">gameSDKDidRequestExit(completion:)</code></td><td>回调 completion</td></tr></tbody></table><p class="note">下注界面三种接入方式（SDK 默认位置、放入宿主容器、宿主自绘）的完整说明见 <a href="#bet-ui">竖屏下注弹窗</a>。</p><h3>下注</h3><pre class="objc"><code>- (void)gameSDKDidReceiveBetOptions:(CocosGameBetOptions *)options gameId:(NSString *)gameId {
     // options.roundId / deadline / areas[].areaCode、areaName / chipsCent（单位分）
     [self.betPanel showOptions:options];
 }
