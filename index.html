@@ -91,16 +91,18 @@ func application(_ application: UIApplication,
   <section class="card" id="update"><h2>热更新接入（0.7.0 起必须）</h2><p>0.7.0 起 SDK 不再内置游戏模块，必须同时引入 <code>CocosGameHotUpdate</code> 并在初始化 SDK 后调用 install：首次打开游戏时下载模块（约 2 MB），之后新版本在后台下载、下次打开生效。正式版本清单地址：<code>https://cocos-game-modules.pages.dev/ios/catalog.json</code>。引入方式见<a href="#install">导入 SDK</a>。</p><pre class="objc"><code>#import &lt;CocosGameHotUpdate/CocosGameHotUpdate.h&gt;
 
 [[CocosGameSDK shared] initializeWithWindow:self.window launchOptions:launchOptions];
-// 需持有返回值；带签名校验可用 installWithCatalogURL:catalogPublicKey:
-self.hotUpdate = [CocosGameHotUpdate installWithCatalogURL:[NSURL URLWithString:@"https://cocos-game-modules.pages.dev/ios/catalog.json"]];
-self.hotUpdate.delegate = self; // 可选，主线程回调进度与失败
-[self.hotUpdate checkForUpdateWithGameId:@"niuniu"]; // 可选，提前下载</code></pre><pre class="swift"><code>import CocosGameHotUpdate
+// 需持有返回值；catalogPublicKey 为清单签名公钥（建议传入，见下方），公钥格式错误时返回 nil
+self.hotUpdate = [CocosGameHotUpdate installWithCatalogURL:[NSURL URLWithString:@"https://cocos-game-modules.pages.dev/ios/catalog.json"]
+                                          catalogPublicKey:catalogPublicKey];
+self.hotUpdate.delegate = self; // 主线程回调进度与失败
+[self.hotUpdate preloadGameId:@"niuniu"]; // 预下载牛牛及 common，进入游戏无需等待</code></pre><pre class="swift"><code>import CocosGameHotUpdate
 
 CocosGameSDK.shared.initialize(window: window, launchOptions: launchOptions)
-// 需持有返回值；带签名校验可用 install(catalogURL:catalogPublicKey:)
-hotUpdate = CocosGameHotUpdate.install(catalogURL: URL(string: "https://cocos-game-modules.pages.dev/ios/catalog.json")!)
-hotUpdate.delegate = self // 可选
-hotUpdate.checkForUpdate(gameId: "niuniu") // 可选，提前下载</code></pre><p class="note">已安装过模块时更新失败不影响打开游戏，继续使用已安装版本；从未下载成功时打开游戏会显示失败与重试。版本清单地址必须为 HTTPS。</p></section><section class="card" id="open"><h2>创建会话并打开游戏</h2><h3>创建会话</h3><pre class="objc"><code>NSError *error = nil;
+// 需持有返回值；catalogPublicKey 为清单签名公钥（建议传入，见下方），公钥格式错误时返回 nil
+hotUpdate = CocosGameHotUpdate.install(catalogURL: URL(string: "https://cocos-game-modules.pages.dev/ios/catalog.json")!,
+                                       catalogPublicKey: catalogPublicKey)
+hotUpdate?.delegate = self
+hotUpdate?.preload(gameId: "niuniu") // 预下载牛牛及 common，进入游戏无需等待</code></pre><p class="note">已安装过模块时更新失败不影响打开游戏，继续使用已安装版本；从未下载成功时打开游戏会显示失败与重试。版本清单地址必须为 HTTPS。错误码：1 网络、2 清单格式、3 校验失败、4 安装失败、5 已取消、6 空间不足、7 清单签名校验失败。接入示例见 <a href="https://github.com/eathwinster-jk/cocos-game-ios-demo">cocos-game-ios-demo</a> 的 <code>AppDelegate.m</code>。</p><h3>宿主接入清单</h3><table><thead><tr><th>级别</th><th>事项</th><th>说明</th></tr></thead><tbody><tr><td>必须</td><td>引入两个库，版本一致</td><td><code>CocosGameSDK</code> 与 <code>CocosGameHotUpdate</code>；0.7.0 起不接入热更新打不开游戏（错误码 100）</td></tr><tr><td>必须</td><td>应用启动时 install</td><td><code class="objc">installWithCatalogURL:catalogPublicKey:</code><code class="swift">install(catalogURL:catalogPublicKey:)</code>；返回值由 AppDelegate 等长生命周期对象持有，公钥格式错误时返回 nil，否则收不到回调</td></tr><tr><td>必须</td><td>清单地址做成配置</td><td>测试与正式分开，不写死在代码里，以后可直接切换到自有域名</td></tr><tr><td>必须</td><td>网络放行</td><td>HTTPS 访问清单与模块域名（当前 <code>cocos-game-modules.pages.dev</code>）；有域名白名单、代理或网关的宿主需加入</td></tr><tr><td>必须</td><td>预留存储空间</td><td>每个游戏约 2 MB，另保留上一可用版本用于回退；默认上限 300 MB，可用 <code class="objc">setMaxStorageBytes:</code><code class="swift">setMaxStorageBytes(_:)</code> 调整</td></tr><tr><td>必须</td><td>处理首次打开需下载</td><td>未下载成功时打开游戏会先下载，失败显示重试；可用 <code class="objc">isReadyForGameId:</code><code class="swift">isReady(gameId:)</code> 判断是否可直接打开</td></tr><tr><td>建议</td><td>校验清单签名</td><td>传入下方正式公钥，清单被篡改时回调错误码 7 且不安装</td></tr><tr><td>建议</td><td>提前预下载</td><td>启动后或进入大厅时调用 <code class="objc">preloadGameId:</code><code class="swift">preload(gameId:)</code>（会一并下载 common），用户进入游戏时无需等待</td></tr><tr><td>建议</td><td>监听结果并上报</td><td><code>CocosGameHotUpdateDelegate</code> 的进度与失败回调接入宿主埋点，按错误码统计失败率</td></tr><tr><td>建议</td><td>日志带上模块版本</td><td>崩溃与客服日志附上 <code class="objc">installedVersionForGameId:</code><code class="swift">installedVersion(gameId:)</code>；牌桌左下角也显示模块版本（如 v2）</td></tr><tr><td>建议</td><td>提供“修复游戏”入口</td><td>关闭游戏后调用 <code class="objc">clearInstalledModulesForGameId:</code><code class="swift">clearInstalledModules(gameId:)</code> 清除模块，下次打开重新下载</td></tr></tbody></table><p>正式清单签名公钥（EC P-256，X.509 DER 的 Base64，可公开，正式与 Demo 渠道共用）：</p><pre><code>MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAErTdV8F92qHswr8ysK3qdPAlCSlOGceiYNZu02CJbHkGYFCbrUg/+TNJDPQNt+nSyS6oM9KIkh7o3+t2DcsyQuA==</code></pre><h3>后续规划与注意事项</h3><ul><li><strong>国内访问</strong>：<code>pages.dev</code> 在国内可能较慢或不可达，正式上线前建议切换到自有域名与国内 CDN，宿主只需修改清单地址，无需升级 SDK。</li><li><strong>多域名容灾</strong>：主域名不可用时切换备用域名，SDK 暂不支持，后续版本提供。</li><li><strong>流量策略</strong>：SDK 暂不区分网络类型；如需仅 Wi-Fi 预下载，由宿主控制预下载的调用时机。</li><li><strong>回到前台检查</strong>：可在 App 回到前台时再次调用预下载，新版本后台下载、下次打开生效。</li><li><strong>灰度与回滚</strong>：由发布方按比例灰度或回滚，SDK 内部按设备分桶，宿主无需改动。</li><li><strong>原生 SDK 升级</strong>：热更新只更新游戏脚本与资源，SDK 原生代码的修复需宿主升级 SDK 并发版，请预留跟进节奏。</li><li><strong>版本兼容</strong>：清单按协议版本与引擎版本过滤，旧 SDK 继续使用最后一个兼容的模块，不会装上不兼容的模块。</li><li><strong>新增游戏</strong>：接口按 gameId 区分，新增游戏时宿主只需对新 gameId 预下载与打开。</li></ul></section><section class="card" id="open"><h2>创建会话并打开游戏</h2><h3>创建会话</h3><pre class="objc"><code>NSError *error = nil;
 CocosGameSessionConfig *sessionConfig = [[CocosGameSessionConfig alloc]
     initWithWebsocketURL:websocketURL
               apiBaseURL:apiBaseURL
