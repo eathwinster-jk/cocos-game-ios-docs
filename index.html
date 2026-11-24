@@ -349,6 +349,7 @@ CocosGameSDK.shared.close()</code></pre></section>
   <section class="card" id="bet-ui"><h2>竖屏下注弹窗：三种接入方式</h2>
 <p>竖屏内嵌时，每局下注阶段要给玩家展示「下注对象 + 筹码」的下注界面。宿主可以<strong>直接使用游戏（SDK）提供的加注卡片</strong>，也可以<strong>完全自己画</strong>；使用 SDK 卡片时，还可以把它放进宿主自己的容器里决定位置。三种方式任选其一，不需要的不用接。全屏横屏时统一由游戏内弹窗展示，与这里的选择无关。</p>
 <p class="note"><strong>0.7.3 起（需新游戏模块）</strong>：未实现下注代理回调时，竖屏下注改为游戏随热更新下发的底部下注抽屉（白色、无遮罩，打开时拦截宿主页面触摸，点抽屉外透明区域可提前关闭，下注成功或倒计时结束自动关闭），方式 A 的 SDK 加注卡片与方式 B 的 <code class="objc">setBetPanelContainer:</code><code class="swift">setBetPanelContainer(_:)</code> 仅在旧版本游戏模块上生效；方式 C 不受影响。</p>
+<p class="note"><strong>额度与可调整范围</strong>：抽屉中的筹码额度直接取自游戏后台的牌桌配置（入座与观战各自一套），与后端保持一致，宿主无需传入。抽屉及记录与规则、离座确认弹窗的样式与位置（高度、圆角、边距、按钮排列、文案、动画等）随游戏模块热更新调整，无需升级 SDK；弹层覆盖范围（打开时整屏拦截触摸）、何时使用这些弹窗、新增弹窗类型等原生行为需升级 SDK。</p>
 <table><thead><tr><th>方式</th><th>宿主要做的</th><th>界面</th><th>下注提交</th><th>适合</th></tr></thead><tbody>
 <tr><td>A. SDK 默认位置</td><td>什么都不用做</td><td>SDK 加注卡片，紧贴游戏容器下方（左右各 14pt），覆盖在宿主内容之上</td><td>SDK 处理</td><td>快速接入、没有特殊布局要求</td></tr>
 <tr><td>B. 放入宿主容器（0.6.12）</td><td>提供一个 UIView 容器，调用 <code class="objc">setBetPanelContainer:</code><code class="swift">setBetPanelContainer(_:)</code></td><td>SDK 加注卡片，位置与宽度由宿主容器决定</td><td>SDK 处理</td><td>想用游戏提供的界面，但要放在页面指定位置（如聊天输入框上方）</td></tr>
